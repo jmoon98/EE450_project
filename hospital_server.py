@@ -9,12 +9,12 @@ BACKLOG = 5
 
 def handle_client_connection(new_fd, addr):
     client_msg = new_fd.recv(4096).decode()  # recv blocks! 
-    print(f"DEBUG: Server received from client {addr}: {client_msg}")
 
     if client_msg.split(',')[0] == "AUTHENTICATE":
         username, password = client_msg.split(',')[1], client_msg.split(',')[2]
         print(f"Hospital Server received an authentication request from a user with hash suffix {username[-5:]}.")
         message = f"AUTHENTICATE,{username},{password}"
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
             udp_sock.bind((HOST, 0))  # 0 = let OS assign dynamic port
             try: 
@@ -46,8 +46,8 @@ def handle_client_connection(new_fd, addr):
                     else:
                         print(f"User with hash {username[-5:]} will be granted patient access.")
                         new_fd.send(b"PATIENT_ACCESS")
-                    tcp_addr = new_fd.getsockname()[1]
-                    print(f"Hospital Server has sent the response from Authentication Server to the client using TCP over port {tcp_addr}.")
+                    tcp_port = new_fd.getsockname()[1]
+                    print(f"Hospital Server has sent the response from Authentication Server to the client using TCP over port {tcp_port}.")
                 else:
                     new_fd.send(auth_serv_response)
                 udp_sock.close()
@@ -59,8 +59,10 @@ def handle_client_connection(new_fd, addr):
 
     elif client_msg.split(',')[0] == "LOOKUP":
         hash_suffix = client_msg.split(',')[1][-5:]
-        print(f"Hospital Server received a lookup request from a user with a hash suffix {hash_suffix} over port {TCP_PORT}.")
+        tcp_port = new_fd.getsockname()[1]
+        print(f"Hospital Server received a lookup request from a user with a hash suffix {hash_suffix} over port {tcp_port}.")
         message = "LOOKUP"
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
             udp_sock.bind((HOST, 0))  # 0 = let OS assign dynamic port
             try: 
@@ -68,7 +70,7 @@ def handle_client_connection(new_fd, addr):
                 print("Hospital Server sent the doctor lookup request to the Appointment server.")
                 appt_server_response, _ = udp_sock.recvfrom(4096)
                 udp_addr = udp_sock.getsockname()[1]
-                print(f"Hospital Server has received the response from Appointment Server using UDP over port {udp_addr}")
+                print(f"Hospital Server has received the response from Appointment Server using UDP over port {udp_addr}.")
                 new_fd.send(appt_server_response)
                 print("Hospital Server has sent the doctor lookup to the client.")
                 udp_sock.close()
@@ -81,17 +83,42 @@ def handle_client_connection(new_fd, addr):
     elif client_msg.split(',')[0] == "LOOKUP_D":
         hash_suffix = client_msg.split(',')[1][-5:]
         doc_name = client_msg.split(',')[2]
-        print(f"Hospital Server has received a lookup request from a user with hash suffix {hash_suffix} to lookup {doc_name} availability using TCP over port {TCP_PORT}.")
+        tcp_port = new_fd.getsockname()[1]
+        print(f"Hospital Server has received a lookup request from a user with hash suffix {hash_suffix} to lookup {doc_name} availability using TCP over port {tcp_port}.")
         message = f"LOOKUP_D,{doc_name}"
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
             udp_sock.bind((HOST, 0))  # 0 = let OS assign dynamic port
             try: 
                 udp_sock.sendto(message.encode(), (HOST, 23214))
                 print("Hospital Server sent the doctor lookup request to the Appointment server.")
                 appt_server_response, _ = udp_sock.recvfrom(4096)
-                print(f"Hospital Server has received the response from Appointment Server using UDP over port {UDP_PORT}.")
+                udp_port = udp_sock.getsockname()[1]
+                print(f"Hospital Server has received the response from Appointment Server using UDP over port {udp_port}.")
                 new_fd.send(appt_server_response)
                 print("The Hospital Server has sent the response to the client.")
+                udp_sock.close()
+                new_fd.close() 
+            except OSError as e:
+                print("socket error:", e)
+                udp_sock.close()
+                sys.exit(1)
+        
+    elif client_msg.split(',')[0] == "SCHEDULE":
+        tcp_port = new_fd.getsockname()[1]
+        print(f"Hospital Server has received a schedule request from a user with hash suffix: {client_msg.split(',')[1][-5:]} to book an appointment using TCP over port {tcp_port}.")
+        message = client_msg
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
+            udp_sock.bind((HOST, 0))
+            try:
+                udp_sock.sendto(message.encode(), (HOST, 23214))
+                print("Hospital Server has sent the schedule request to the appointment server.")
+                appt_server_response, _ = udp_sock.recvfrom(4096)
+                udp_port = udp_sock.getsockname()[1]
+                print(f"Hospital Server has received the response from Appointment Server using UDP over {udp_port}.")
+                new_fd.send(appt_server_response)
+                print("The hospital server has sent the response to the client.")
                 udp_sock.close()
                 new_fd.close() 
             except OSError as e:

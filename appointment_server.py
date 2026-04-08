@@ -68,6 +68,41 @@ def handle_lookup_d(doc_name:str):
         else:
             print(f"{doc_name} has some time slots available.")
         return ",".join(avail_times)
+    
+def handle_schedule(doc_name:str, block_period:str, illness:str):
+    found_doc = False
+    time_filled = False
+    avail_times = []
+
+    hr, min = block_period.split(':')
+    if int(hr) < 9 or int(hr) > 16:
+        time_filled = True
+    # !! will they test invalid inputs..? like having 99 for min input, etc. 
+    # specs to say "must be in format HH:MM"...
+    # or non-00 mins?? 
+    # what if they enter an invalid time AND all times are taken up? 
+
+    with open("appointments.txt", "r") as f:
+        for line in f:
+            if line.strip() == doc_name:
+                found_doc = True
+                continue
+            if found_doc:
+                if line.strip() and line.strip() != doc_name and "Dr." in line.strip():
+                    break
+                line_split = line.strip().split()
+                if line_split[0] == block_period:
+                    if len(line_split) >= 2:
+                        time_filled = True
+                elif line_split[0] != block_period and len(line_split) == 1:
+                    avail_times.append(line_split[0])
+    if not time_filled:
+        return True, []
+    else:
+        return False, avail_times
+                
+    
+
 
 
 def main():
@@ -87,6 +122,23 @@ def main():
                     print("The Appointment Server has received a doctor availability request.")
                     sockfd.sendto(handle_lookup_d(data.strip().split(',')[1]).encode(), addr)
                     print("The Appointment Server has sent the lookup result to the Hospital Server.")
+                elif data.strip().split(',')[0] == "SCHEDULE":
+                    hash_sfx, doc_name, block_period, illness = data.strip().split(',')[1][-5:], data.strip().split(',')[2], data.strip().split(',')[3], data.strip().split(',')[4]
+                    print(f"Appointment scheduling request received (time: {block_period}, doctor: {doc_name}, patient hash suffix: {hash_sfx}, illness: {illness}).")
+                    scheduled, other_times = handle_schedule(doc_name, block_period, illness)
+                    if scheduled:
+                        print(f"Appointment has been scheduled successfully for user {hash_sfx} with {doc_name}.")
+                        sockfd.sendto("SUCCESS".encode(), addr)
+                    else:
+                        print("The requested appointment time is not available.")
+                        other_times_str = ",".join(other_times)
+                        if len(other_times) == 0:
+                            message = f"FAILURE_no,{other_times_str}"
+                        else:
+                            message = f"FAILURE_yes,{other_times_str}"
+                        sockfd.sendto(message.encode(), addr)
+                        
+
     
         except KeyboardInterrupt:
             print("\nServer shutting down.")
