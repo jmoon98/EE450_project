@@ -69,39 +69,77 @@ def handle_lookup_d(doc_name:str):
             print(f"{doc_name} has some time slots available.")
         return ",".join(avail_times)
     
-def handle_schedule(doc_name:str, block_period:str, illness:str):
+def handle_schedule(hash_usr: str, doc_name:str, block_period:str, illness:str):
     found_doc = False
-    time_filled = False
+    appt_failed = False
     avail_times = []
 
-    hr, min = block_period.split(':')
-    if int(hr) < 9 or int(hr) > 16:
-        time_filled = True
-    # !! will they test invalid inputs..? like having 99 for min input, etc. 
-    # specs to say "must be in format HH:MM"...
-    # or non-00 mins?? 
-    # what if they enter an invalid time AND all times are taken up? 
+    if ':' not in block_period:
+        appt_failed = True
+    else:
+        hr, min = block_period.split(':')
+        if int(hr) < 9 or int(hr) > 16 or min != '00':
+            appt_failed = True
 
     with open("appointments.txt", "r") as f:
-        for line in f:
-            if line.strip() == doc_name:
-                found_doc = True
+        lines = f.readlines()
+
+    for i, line in enumerate(lines):
+        if line.strip() == doc_name:
+            found_doc = True
+            continue
+
+        if found_doc:
+            if line.strip() and "Dr." in line.strip():
+                break
+            line_split = line.strip().split()
+            if not line_split:
                 continue
-            if found_doc:
-                if line.strip() and line.strip() != doc_name and "Dr." in line.strip():
+            if line_split[0] == block_period:
+                if len(line_split) >= 2:
+                    appt_failed = True
+                elif not appt_failed:
+                    # logic for changing appointment.txt! 
+                    lines[i] = f"{block_period} {hash_usr} {illness}\n"
                     break
-                line_split = line.strip().split()
-                if line_split[0] == block_period:
-                    if len(line_split) >= 2:
-                        time_filled = True
-                elif line_split[0] != block_period and len(line_split) == 1:
-                    avail_times.append(line_split[0])
-    if not time_filled:
+            elif len(line_split) == 1:
+                avail_times.append(line_split[0])
+    # write everything back
+    if not appt_failed:
+        with open("appointments.txt", "w") as f:
+            f.writelines(lines)
+
+    if not appt_failed:
         return True, []
     else:
         return False, avail_times
                 
+
+def handle_cancel(hash_usr: str):
+    found_and_canceled = False
+    canceled_appt = []
+    curr_doc = ""
+
+    with open("appointments.txt", "r") as f:
+        lines = f.readlines()
     
+    for i, line in enumerate(lines):
+        if "Dr." in line:
+            curr_doc = line.strip()
+            continue
+        line_entries = line.strip().split()
+        if len(line_entries) > 1:
+            if line_entries[1] == hash_usr:
+                canceled_appt.append(curr_doc.strip())
+                canceled_appt.append(line_entries[0])
+                lines[i] = f"{line_entries[0]}\n"
+                found_and_canceled = True
+    
+    if found_and_canceled:
+        with open("appointments.txt", "w") as f:
+            f.writelines(lines)
+        return True, ",".join(canceled_appt)
+    return False, ""
 
 
 
@@ -118,14 +156,17 @@ def main():
                     print("The Appointment Server has received a doctor availability request.")
                     sockfd.sendto(handle_lookup().encode(), addr)
                     print("The Appointment Server has sent the lookup result to the Hospital Server.")
+
                 elif data.strip().split(',')[0] == "LOOKUP_D":
                     print("The Appointment Server has received a doctor availability request.")
                     sockfd.sendto(handle_lookup_d(data.strip().split(',')[1]).encode(), addr)
                     print("The Appointment Server has sent the lookup result to the Hospital Server.")
+
                 elif data.strip().split(',')[0] == "SCHEDULE":
-                    hash_sfx, doc_name, block_period, illness = data.strip().split(',')[1][-5:], data.strip().split(',')[2], data.strip().split(',')[3], data.strip().split(',')[4]
+                    hash_usr, doc_name, block_period, illness = data.strip().split(',')[1], data.strip().split(',')[2], data.strip().split(',')[3], data.strip().split(',')[4]
+                    hash_sfx = hash_usr[-5:]
                     print(f"Appointment scheduling request received (time: {block_period}, doctor: {doc_name}, patient hash suffix: {hash_sfx}, illness: {illness}).")
-                    scheduled, other_times = handle_schedule(doc_name, block_period, illness)
+                    scheduled, other_times = handle_schedule(hash_usr, doc_name, block_period, illness)
                     if scheduled:
                         print(f"Appointment has been scheduled successfully for user {hash_sfx} with {doc_name}.")
                         sockfd.sendto("SUCCESS".encode(), addr)
@@ -137,7 +178,18 @@ def main():
                         else:
                             message = f"FAILURE_yes,{other_times_str}"
                         sockfd.sendto(message.encode(), addr)
-                        
+
+                elif data.strip().split(',')[0] == "CANCEL":
+                    hash_usr = data.strip().split(',')[1]
+                    print(f"Appointment Server has received a cancel appointment command for the user with hash suffix: {hash_usr[-5:]}.")
+                    cancel_res, canceled_appt = handle_cancel(hash_usr)
+                    if cancel_res:
+                        print("Successfully cancelled appointment.")
+                        sockfd.sendto(f"SUCCESS,{canceled_appt}".encode(), addr)
+                    else:
+                        print("Error: Failed to find appointment.")
+                        sockfd.sendto("FAILURE".encode(), addr)
+                    
 
     
         except KeyboardInterrupt:

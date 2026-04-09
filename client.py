@@ -28,6 +28,9 @@ def stream_client(cmd:str, args=None):
         doc_name, block_period, illness = args[1], args[2], args[3]
         message = f"SCHEDULE,{sha256_hash(username)},{doc_name},{block_period},{illness}"
     
+    elif cmd == "cancel":
+        message = f"CANCEL,{sha256_hash(username)}"
+    
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
@@ -41,6 +44,8 @@ def stream_client(cmd:str, args=None):
                 print(f"Patient {username} sent a lookup request to the hospital server for {doc_name}.")
             elif cmd == "schedule":
                 print(f"{username} sent an appointment schedule request to the hospital server.")
+            elif cmd == "cancel":
+                print(f"{username} sent a cancellation request to the Hospital Server.")
             response = sockfd.recv(4096).decode() 
             client_port = sockfd.getsockname()[1]  # getting client-side port number!!
             sockfd.close()
@@ -64,6 +69,9 @@ def main():
 
         while True: 
             command = input(">").strip().split()
+
+            if not command:
+                continue
             
             # LOOKUP: hospital server -> appointment server, returns list of doctors with at least one available slot 
             if command[0] == "lookup" and len(command) == 1:
@@ -96,16 +104,28 @@ def main():
             elif command[0] == "schedule":
                 doc_name, block_period, illness = command[1], command[2], command[3]
                 schedule_response, schedule_port = stream_client("schedule", (username, doc_name, block_period, illness))
-                print(f"The client received the response from the Hospital Server using TCP over port {schedule_port}")
+                print(f"The client received the response from the Hospital Server using TCP over port {schedule_port}.")
                 if schedule_response.split(',')[0] == "SUCCESS":
                     print(f"\nAn appointment has been successfully scheduled for patient {username} with {doc_name} at {block_period}.")
                 elif schedule_response.split(',')[0] == "FAILURE_no":
                     print(f"\nUnable to schedule an appointment with {doc_name} at this time, as all time blocks have been taken up.")
                 elif schedule_response.split(',')[0] == "FAILURE_yes":
                     print(f"Unable to schedule an appointment with {doc_name} at {block_period}. Other available time blocks are")
-                    other_times = [t for t in schedule_response.split(',') if t and t != "FAILURE_yes"]
+                    response_parts = schedule_response.split(',')
+                    other_times = response_parts[1:]
+                    other_times = [t for t in other_times if t]
                     for time in other_times:
                         print(time)
+
+            elif command[0] == "cancel":
+                cancel_response, cancel_port = stream_client("cancel", (username,))
+                print(f"The client received the response from the Hospital Server using TCP over port {cancel_port}\n")
+                cancel_response = cancel_response.split(',')
+                if cancel_response[0] == "SUCCESS":
+                    print(f"You have successfully cancelled your appointment with {cancel_response[1]} at {cancel_response[2]}.")
+                else:
+                    print("You have no appointments available to cancel.")
+                
 
 
     else:
