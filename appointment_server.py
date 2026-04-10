@@ -134,12 +134,32 @@ def handle_cancel(hash_usr: str):
                 canceled_appt.append(line_entries[0])
                 lines[i] = f"{line_entries[0]}\n"
                 found_and_canceled = True
+                break
     
     if found_and_canceled:
         with open("appointments.txt", "w") as f:
             f.writelines(lines)
         return True, ",".join(canceled_appt)
     return False, ""
+
+def handle_view_appt(hash_usr: str):
+    found_appt = None
+    curr_doc = ""
+
+    with open("appointments.txt", "r") as f:
+        for line in f:
+            if "Dr." in line:
+                curr_doc = line.strip()
+                continue
+            line_entries = line.strip().split()
+            if len(line_entries) >= 2:
+                if line_entries[1] == hash_usr:
+                    found_appt = line_entries
+                    break
+    
+    if found_appt is not None:
+        return True, f"SUCCESS,{curr_doc},{found_appt[0]}"
+    return False, "FAILURE"
 
 
 
@@ -189,6 +209,17 @@ def main():
                     else:
                         print("Error: Failed to find appointment.")
                         sockfd.sendto("FAILURE".encode(), addr)
+
+                elif data.strip().split(',')[0] == "VIEW_APPT":
+                    hash_usr = data.strip().split(',')[1]
+                    print(f"Appointment Server has received a view appointment command for the user with hash suffix {hash_usr[-5:]}.")
+                    scheduled, msg = handle_view_appt(hash_usr)
+                    if scheduled:
+                        print(f"Returning details regarding the appointment for the user with hash suffix {hash_usr[-5:]}.")
+                    else:
+                        print(f"The user with hash suffix {hash_usr[-5:]} has no appointment in the system.")
+                    sockfd.sendto(msg.encode(), addr)
+
                     
 
     

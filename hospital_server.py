@@ -147,7 +147,28 @@ def handle_client_connection(new_fd, addr):
                 print("socket error:", e)
                 udp_sock.close()
                 sys.exit(1)
+    
+    elif client_msg.split(',')[0] == "VIEW_APPT":
+        tcp_port = new_fd.getsockname()[1]
+        print(f"Hospital server has received a view appointment request from a user with hash suffix {client_msg.split(',')[1][-5:]} to view their appointment details using TCP over port {tcp_port}.")
+        message = client_msg
 
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
+            udp_sock.bind((HOST, 0))
+            try:
+                udp_sock.sendto(message.encode(), (HOST, 23214))
+                print("Hospital Server has sent the view appointments request to the Appointment Server.")
+                appt_server_response, _ = udp_sock.recvfrom(4096)
+                udp_port = udp_sock.getsockname()[1]
+                print(f"Hospital Server has received the response from the appointment server using UDP over port {udp_port}.")
+                new_fd.send(appt_server_response)
+                print("The hospital server has sent the response to the client.")
+                udp_sock.close()
+                new_fd.close()
+            except OSError as e:
+                print("socket error:", e)
+                udp_sock.close()
+                sys.exit(1)
 
         '''
         with open("hospital.txt", "r") as f:

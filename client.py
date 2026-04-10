@@ -31,6 +31,9 @@ def stream_client(cmd:str, args=None):
     elif cmd == "cancel":
         message = f"CANCEL,{sha256_hash(username)}"
     
+    elif cmd == "view_appt":
+        message = f"VIEW_APPT,{sha256_hash(username)}"
+    
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
@@ -46,6 +49,9 @@ def stream_client(cmd:str, args=None):
                 print(f"{username} sent an appointment schedule request to the hospital server.")
             elif cmd == "cancel":
                 print(f"{username} sent a cancellation request to the Hospital Server.")
+            elif cmd == "view_appt":
+                print(f"{username} sent a request to view their appointment to the Hospital Server.")
+
             response = sockfd.recv(4096).decode() 
             client_port = sockfd.getsockname()[1]  # getting client-side port number!!
             sockfd.close()
@@ -125,6 +131,15 @@ def main():
                     print(f"You have successfully cancelled your appointment with {cancel_response[1]} at {cancel_response[2]}.")
                 else:
                     print("You have no appointments available to cancel.")
+            
+            elif command[0] == "view_appointment":
+                view_appt_response, view_appt_port = stream_client("view_appt", (username,))
+                view_appt_response = view_appt_response.split(',')
+                print(f"The client received the response from the hospital server using TCP over port {view_appt_port}\n")
+                if view_appt_response[0] == "SUCCESS":
+                    print(f"You have an appointment scheduled with {view_appt_response[1]} at {view_appt_response[2]}.")
+                else:
+                    print("You do not have an appointment today.")
                 
 
 
