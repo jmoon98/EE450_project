@@ -33,6 +33,9 @@ def stream_client(cmd:str, args=None):
     
     elif cmd == "view_appt":
         message = f"VIEW_APPT,{sha256_hash(username)}"
+
+    elif cmd == "view_appts":
+        message = f"VIEW_APPTS,{sha256_hash(username)},{username}"
     
 
     try:
@@ -51,6 +54,8 @@ def stream_client(cmd:str, args=None):
                 print(f"{username} sent a cancellation request to the Hospital Server.")
             elif cmd == "view_appt":
                 print(f"{username} sent a request to view their appointment to the Hospital Server.")
+            elif cmd == "view_appts":
+                print(f"{username} sent a request to view their scheduled appointments to the Hospital Server.")
 
             response = sockfd.recv(4096).decode() 
             client_port = sockfd.getsockname()[1]  # getting client-side port number!!
@@ -69,6 +74,28 @@ def main():
     auth_response, auth_port = stream_client("auth", (username, password))
     if auth_response == "DOCTOR_ACCESS":
         print(f"{username} received the authentication result. Authentication successful. You have been granted doctor access.")
+
+        while True:
+            command = input(">").strip().split()
+
+            if not command: 
+                continue
+
+            # VIEW_APPOINTMENTS
+            if command[0] == "view_appointments":
+                view_appt_response, view_appt_port = stream_client("view_appts", (username,))
+                print(f"The client received the response from the hospital server using TCP over port {view_appt_port}\n")
+                view_appt_response = view_appt_response.split(',')
+                if view_appt_response[0] == "FAILURE":
+                    print("You do not have any appointments scheduled.")
+                else:
+                    appt_times = view_appt_response[1:]
+                    appt_times = [t for t in appt_times if t]
+                    print(f"{username} is scheduled at times:")
+                    for appt in appt_times:
+                        print(appt)
+
+
         
     elif auth_response == "PATIENT_ACCESS":
         print(f"{username} received the authentication result. Authentication successful. You have been granted patient access.")
@@ -107,6 +134,7 @@ def main():
                     for time in d_list:
                         print(time)
 
+            # SCHEDULE
             elif command[0] == "schedule":
                 doc_name, block_period, illness = command[1], command[2], command[3]
                 schedule_response, schedule_port = stream_client("schedule", (username, doc_name, block_period, illness))
@@ -123,6 +151,7 @@ def main():
                     for time in other_times:
                         print(time)
 
+            # CANCEL
             elif command[0] == "cancel":
                 cancel_response, cancel_port = stream_client("cancel", (username,))
                 print(f"The client received the response from the Hospital Server using TCP over port {cancel_port}\n")
@@ -131,7 +160,8 @@ def main():
                     print(f"You have successfully cancelled your appointment with {cancel_response[1]} at {cancel_response[2]}.")
                 else:
                     print("You have no appointments available to cancel.")
-            
+
+            # VIEW_APPOINTMENT
             elif command[0] == "view_appointment":
                 view_appt_response, view_appt_port = stream_client("view_appt", (username,))
                 view_appt_response = view_appt_response.split(',')

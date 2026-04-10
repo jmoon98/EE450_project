@@ -161,6 +161,25 @@ def handle_view_appt(hash_usr: str):
         return True, f"SUCCESS,{curr_doc},{found_appt[0]}"
     return False, "FAILURE"
 
+def handle_view_appts(doc_usr: str):
+    doc_appts = []
+    doc_found = False
+    with open("appointments.txt", "r") as f:
+        for line in f:
+            if not doc_found and line.strip() == doc_usr:
+                doc_found = True
+                continue
+            elif doc_found and "Dr." in line:
+                break
+            if doc_found:
+                line_split = line.strip().split()
+                if not line_split: 
+                    continue
+                if len(line_split) >= 2:
+                    doc_appts.append(line_split[0])
+    return doc_appts
+
+
 
 
 def main():
@@ -218,6 +237,18 @@ def main():
                         print(f"Returning details regarding the appointment for the user with hash suffix {hash_usr[-5:]}.")
                     else:
                         print(f"The user with hash suffix {hash_usr[-5:]} has no appointment in the system.")
+                    sockfd.sendto(msg.encode(), addr)
+
+                elif data.strip().split(',')[0] == "VIEW_APPTS":
+                    doc_usr = data.strip().split(',')[2]
+                    print(f"Appointment Server has received a request to view appointments scheduled for {doc_usr}.")
+                    doc_appts = handle_view_appts(doc_usr)
+                    if len(doc_appts) == 0:
+                        print(f"No appointments have been made for {doc_usr}.")
+                        msg = "FAILURE"
+                    else:
+                        print(f"Returning the scheduled appointments for {doc_usr}.")
+                        msg = f"SUCCESS,{','.join(doc_appts)}"
                     sockfd.sendto(msg.encode(), addr)
 
                     
