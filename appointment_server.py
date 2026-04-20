@@ -179,6 +179,28 @@ def handle_view_appts(doc_usr: str):
                     doc_appts.append(line_split[0])
     return doc_appts
 
+def handle_find_illness(hash_usr: str):
+    with open("appointments.txt", "r") as f:
+        lines = f.readlines()
+    for i, line in enumerate(lines):
+        cols = line.strip().split()
+        if len(cols) > 1 and len(cols[1]) >= 5 and cols[1][-5:] == hash_usr:
+            # retrieve associated illness value
+            # then removes hashed patient identifier and illness from that time block
+            # (leaving only original time entry)
+            illness = cols[2]
+            timeblock = cols[0]
+            print(f"Sending back the requested information to the Hospital server.")
+            lines[i] = f"{timeblock}\n"
+
+
+    with open("appointments.txt", "w") as f:
+        f.writelines(lines)
+        print(f"Successfully removed {hash_usr} appointment slot, {timeblock} is now free to be scheduled for tomorrow.")
+
+    return illness
+
+
 
 
 
@@ -250,6 +272,12 @@ def main():
                         print(f"Returning the scheduled appointments for {doc_usr}.")
                         msg = f"SUCCESS,{','.join(doc_appts)}"
                     sockfd.sendto(msg.encode(), addr)
+
+                elif data.strip().split(',')[0] == "PRESCRIBE":
+                    doc_name, hash_suffix = data.strip().split(',')[1], data.strip().split(',')[2]
+                    print(f"Appointment Server has received a request from Hospital Server regarding information about a user with hash suffix {hash_suffix} from {doc_name}.")
+                    illness = handle_find_illness(hash_suffix)
+                    sockfd.sendto(illness.encode(), addr)
 
                     
 

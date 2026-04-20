@@ -37,6 +37,9 @@ def stream_client(cmd:str, args=None):
     elif cmd == "view_appts":
         message = f"VIEW_APPTS,{sha256_hash(username)},{username}"
     
+    elif cmd == "prescribe":
+        doc_name, frequency = args[1], args[2]
+        message = f"PRESCRIBE,{doc_name},{sha256_hash(username)},{username},{frequency}"
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
@@ -56,6 +59,8 @@ def stream_client(cmd:str, args=None):
                 print(f"{username} sent a request to view their appointment to the Hospital Server.")
             elif cmd == "view_appts":
                 print(f"{username} sent a request to view their scheduled appointments to the Hospital Server.")
+            elif cmd == "prescribe":
+                print(f"{doc_name} sent a request to the Hospital Server to prescribe {username} following their diagnosis.")
 
             response = sockfd.recv(4096).decode() 
             client_port = sockfd.getsockname()[1]  # getting client-side port number!!
@@ -94,6 +99,15 @@ def main():
                     print(f"{username} is scheduled at times:")
                     for appt in appt_times:
                         print(appt)
+            
+            # PRESCRIBE
+            if command[0] == "prescribe":
+                patient_username, frequency = command[1], command[2]
+                prescribe_response, prescribe_port = stream_client("prescribe", (patient_username, username, frequency))
+                treatment = prescribe_response.strip().split(',')[1]
+                
+                print(f"The client received the response from the hospital server using TCP over port {prescribe_port}\n")
+                print(f"You have successfully prescribed {patient_username} with {treatment}, to be taken {frequency}.")
 
 
         

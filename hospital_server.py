@@ -7,6 +7,13 @@ TCP_PORT = 26214
 HOST = "127.0.0.1"
 BACKLOG = 5
 
+def handle_treatment_lookup(illness:str):
+    with open("hospital.txt", "r") as f:
+        for line in f:
+            cols = line.strip().split()
+            if len(cols) > 1 and cols[0] == illness:
+                return cols[1]
+
 def handle_client_connection(new_fd, addr):
     client_msg = new_fd.recv(4096).decode()  # recv blocks! 
 
@@ -187,6 +194,41 @@ def handle_client_connection(new_fd, addr):
                 print("The hospital server has sent the response to the client.")
                 udp_sock.close()
                 new_fd.close()
+            except OSError as e:
+                print("socket error:", e)
+                udp_sock.close()
+                sys.exit(1)
+
+    elif client_msg.split(',')[0] == "PRESCRIBE":
+        tcp_port = new_fd.getsockname()[1]
+        doc_name, hash_patient, patient, frequency = client_msg.split(',')[1], client_msg.split(',')[2], client_msg.split(',')[3], client_msg.split(',')[4]
+        print(f"Hospital Server has received a prescription request from {doc_name} for a user with hash suffix {hash_patient[-5:]} using TCP over port {tcp_port}.")
+
+        message = f"PRESCRIBE,{doc_name},{hash_patient[-5:]}"
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
+            udp_sock.bind((HOST, 0))
+            try:
+                udp_sock.sendto(message.encode(), (HOST, 23214))
+                print(f"Hospital Server has sent a request to fetch patients with hash suffix {hash_patient[-5:]} illness information to the Appointment Server.")
+                appt_server_response, _ = udp_sock.recvfrom(4096)
+                udp_port = udp_sock.getsockname()[1]
+                print(f"Hospital Server has received the illness response from the Appointment server using UDP over port {udp_port}.")
+                illness = appt_server_response.decode()
+                print(f"Acquiring treatment for {illness} from the database.")
+                treatment = handle_treatment_lookup(illness)
+
+                # send prescription request to prescription server! 
+                message = f"PRESCRIBE,{doc_name},{hash_patient},{treatment},{frequency}"
+                udp_sock.sendto(message.encode(), (HOST, 22214))
+                print(f"Hospital server has sent the prescription request to the prescription server to prescribe {treatment}.")
+                presc_server_response, _ = udp_sock.recvfrom(4096)
+                udp_port = udp_sock.getsockname()[1]
+                print(f"Hospital server has received the response from the prescription server using UDP over port {udp_port}")
+                new_fd.send(presc_server_response)
+                print(f"The hospital server has sent the response to the client.")
+                udp_sock.close()
+                new_fd.close()
+
             except OSError as e:
                 print("socket error:", e)
                 udp_sock.close()
