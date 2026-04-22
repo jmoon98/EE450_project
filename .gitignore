@@ -1,2 +1,3 @@
 docker/
 *.pdf
+.DS_Store
