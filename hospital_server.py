@@ -252,7 +252,29 @@ def handle_client_connection(new_fd, addr):
                 print(f"Hospital server has sent the response to the client.")
                 udp_sock.close()
                 new_fd.close()
+            except OSError as e:
+                print("socket error:", e)
+                udp_sock.close()
+                sys.exit(1)
+    
+    elif client_msg.split(',')[0] == "VIEW_PP":
+        tcp_port = new_fd.getsockname()[1]
+        patient_name, patient_hash = client_msg.split(',')[1], client_msg.split(',')[2]
+        print(f"Hospital Server has received a prescription request from a patient with hash suffix {patient_hash[-5:]} to view their prescription details using TCP over port {tcp_port}.")
 
+        message = f"VIEW_P,{patient_hash}"
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
+            udp_sock.bind((HOST, 0))
+            try:
+                udp_sock.sendto(message.encode(), (HOST, 22214))
+                print(f"Hospital Server has sent the prescription request to the Prescription Server.")
+                presc_server_response, _ = udp_sock.recvfrom(4096)
+                udp_port = udp_sock.getsockname()[1]
+                print(f"Hospital server has received the response from the prescription server using UDP over port {udp_port}.")
+                new_fd.send(presc_server_response)
+                print(f"Hospital server has sent the response to the client.")
+                udp_sock.close()
+                new_fd.close()
             except OSError as e:
                 print("socket error:", e)
                 udp_sock.close()

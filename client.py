@@ -44,6 +44,9 @@ def stream_client(cmd:str, args=None):
     elif cmd == "view_prescription_d":
         patient_name = args[1]
         message = f"VIEW_PD,{username},{patient_name},{sha256_hash(patient_name)}"
+    
+    elif cmd == "view_prescription_p":
+        message = f"VIEW_PP,{username},{sha256_hash(username)}"
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
@@ -67,6 +70,8 @@ def stream_client(cmd:str, args=None):
                 print(f"{username} sent a request to the Hospital Server to prescribe {patient_name} following their diagnosis.")
             elif cmd == "view_prescription_d":
                 print(f"{username} sent a request to view {patient_name} prescription to the Hospital Server.") 
+            elif cmd == "view_prescription_p":
+                print(f"{username} sent a request to view their prescription to the Hospital Server.")
 
             response = sockfd.recv(4096).decode() 
             client_port = sockfd.getsockname()[1]  # getting client-side port number!!
@@ -107,7 +112,7 @@ def main():
                         print(appt)
             
             # PRESCRIBE
-            if command[0] == "prescribe":
+            elif command[0] == "prescribe":
                 patient_username, frequency = command[1], command[2]
                 prescribe_response, prescribe_port = stream_client("prescribe", (username, patient_username, frequency))
                 treatment = prescribe_response.strip().split(',')[1]
@@ -116,17 +121,25 @@ def main():
                 print(f"You have successfully prescribed {patient_username} with {treatment}, to be taken {frequency}.")
 
             # VIEW PRESCRIPTION
-            if command[0] == "view_prescription":
+            elif command[0] == "view_prescription":
                 patient_username = command[1]
                 view_presc_response, view_presc_port = stream_client("view_prescription_d", (username, patient_username))
                 view_presc_response = view_presc_response.split(',')
                 
                 print(f"The client received the response from the hospital server using TCP over port {view_presc_port}\n")
-                if view_presc_response[0] == "FAILURE":
+
+                if view_presc_response[0] == "NOTFOUND":
                     print(f"{patient_username} does not have a prescription.")
                 else:
                     doc, treatment, freq = view_presc_response[0], view_presc_response[1], view_presc_response[2]
                     print(f"{patient_username} has been prescribed {treatment}, to be taken {freq}, by {doc}.")
+            
+            elif command[0] == "help":
+                print("Please enter the command:\n<view_appointments>,\n<prescribe <patient> <frequency>>,\n<view_prescription <patient>>,\n<quit>")
+
+            elif command[0] == "quit":
+                print("You have successfully been logged out.")
+                break
 
 
 
@@ -204,8 +217,31 @@ def main():
                     print(f"You have an appointment scheduled with {view_appt_response[1]} at {view_appt_response[2]}.")
                 else:
                     print("You do not have an appointment today.")
-                
 
+            # VIEW_PRESCRIPTION
+            elif command[0] == "view_prescription":
+                view_presc_response, view_presc_port = stream_client("view_prescription_p", (username,))
+                view_presc_response = view_presc_response.split(',')
+                print(f"The client received the response from the hospital server using TCP over port {view_presc_port}")
+
+                if view_presc_response[0] == "NOTFOUND":
+                    print(f"You do not have a prescription to look up.")
+                elif view_presc_response[0] == "NOPRESC":
+                    doc_name = view_presc_response[1]
+                    print(f"You were not prescribed any treatment by {doc_name} following your diagnosis.")
+                else:
+                    doc_name, treatment, freq = view_presc_response[0], view_presc_response[1], view_presc_response[2]
+                    print(f"You have been prescribed {treatment}, to be taken {freq}, by {doc_name}.")
+            
+            # HELP
+            elif command[0] == "help":
+                print("Please enter the command:\n<lookup>,\n<lookup <doctor>>,\n<schedule <doctor> <start_time> <illness>>,\n<cancel>,\n<view_appointment>,\n<view_prescription>,\n<quit>")
+
+            elif command[0] == "quit":
+                print("You have successfully been logged out.")
+                break
+
+                
 
     else:
         print("The credentials are incorrect. Please try again.")
