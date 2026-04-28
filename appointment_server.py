@@ -207,10 +207,14 @@ def handle_find_illness(hash_usr: str):
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
         sockfd.bind((HOST, PORT))
+        sockfd.settimeout(1.0)
         print(f"Appointment Server is up and running using UDP on port {PORT}.")
         try:
             while True:
-                data, addr = sockfd.recvfrom(4096)
+                try:
+                    data, addr = sockfd.recvfrom(4096)
+                except socket.timeout:
+                    continue
                 data = data.decode()
 
                 if data.strip().split(',')[0] == "LOOKUP":

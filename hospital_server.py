@@ -303,16 +303,22 @@ def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sockfd:
         sockfd.bind((HOST, TCP_PORT))
         sockfd.listen(BACKLOG)
+        sockfd.settimeout(1.0)
         print(f"Hospital Server is up and running using UDP on port {UDP_PORT}.")
         try:
             while True:
-                new_fd, addr = sockfd.accept()
+                try:
+                    new_fd, addr = sockfd.accept()
+                except socket.timeout:
+                    continue
                 thread = threading.Thread(target=handle_client_connection, args=(new_fd, addr))
-                thread.start() 
+                thread.daemon = True
+                thread.start()
 
         except KeyboardInterrupt:
             print("\nServer shutting down.")
             sockfd.close()
+            sys.exit(0)
 
 
 if __name__ == "__main__":

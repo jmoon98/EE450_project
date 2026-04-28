@@ -1,3 +1,4 @@
 docker/
 *.pdf
 .DS_Store
+*.bat
