@@ -15,14 +15,10 @@ def check_users(username:str, password:str):
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
         sockfd.bind((HOST, PORT))
-        sockfd.settimeout(1.0)
         print(f"Authentication Server is up and running using UDP on port {PORT}.")
         try:
             while True:
-                try:
-                    data, addr = sockfd.recvfrom(1024)
-                except socket.timeout:
-                    continue
+                data, addr = sockfd.recvfrom(1024)
                 data = data.decode()
                 username, password = data.split(',')[1], data.split(',')[2]
                 print(f"Authentication Server has received an authentication request for a user with hash suffix: {username[-5:]}.")

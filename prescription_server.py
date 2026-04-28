@@ -24,15 +24,11 @@ def handle_view_presc(patient_hash:str):
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sockfd:
         sockfd.bind((HOST, PORT))
-        sockfd.settimeout(1.0)
         print(f"Prescription Server is up and running using UDP on port {PORT}.")
 
         try:
             while True:
-                try:
-                    data, addr = sockfd.recvfrom(4096)
-                except socket.timeout:
-                    continue
+                data, addr = sockfd.recvfrom(4096)
                 data = data.decode()
 
                 if data.strip().split(',')[0] == "PRESCRIBE":
